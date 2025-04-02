@@ -1,7 +1,7 @@
 import numpy as np
 import math
 import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
+from matplotlib.animation import FuncAnimation, PillowWriter
 
 def get_second_point(point, angle, length):
     x = point[0]
@@ -68,18 +68,36 @@ def solve_fourbar(theta_2, l1, l2, l3, l4, delta):
     return (theta_2), theta_3, theta_4
 
 # Define a function to plot lines between points
-def plot_line(segment, label=None):
+def plot_line(segment, label=None, linestyle = "solid"):
     x_values = [segment[0][0], segment[1][0]]
     y_values = [segment[0][1], segment[1][1]]
-    plt.plot(x_values, y_values, marker='o', label=label)
+    plt.plot(x_values, y_values, marker='o', label=label, linestyle = linestyle)
 
+
+def fourbarvel(th_1, th_2, th_3, th_4, l2, l3, l4, omega_2):
+    th_1_vec = np.deg2rad(th_1)
+    th_2_vec = np.deg2rad(th_2 - th_1)
+    th_3_vec = np.deg2rad(th_3 - th_1)
+    th_4_vec = np.deg2rad(th_4 - th_1)
+
+    
+    # solve for the angular velocities
+    omega_3 = omega_2*l2/l3*(np.sin(th_4_vec-th_2_vec))/(np.sin(th_3_vec-th_4_vec))
+    omega_4 = omega_2*l2/l4*(np.sin(th_2_vec-th_3_vec))/(np.sin(th_4_vec-th_3_vec))
+    
+    VBA = [l3*omega_3*-np.sin(th_3_vec + th_1_vec),l3*omega_3*np.cos(th_3_vec + th_1_vec)]
+    VB = [l4*omega_4*-np.sin(th_4_vec + th_1_vec),l4*omega_4*np.cos(th_4_vec + th_1_vec)]
+
+
+
+    return VBA, VB
 
 loop1_theta2 = 0
 loop2_theta2 = 0
 loop3_theta2 = 0
 
 
-fig, ax = plt.subplots()
+fig, ax = plt.subplots(figsize=(16, 9))
 ax.set_xlim(-20, 20)
 ax.set_ylim(-5, 25)
 
@@ -92,7 +110,7 @@ def update(frame):
     loop1_l4 = 8
     loop1_theta1 = 0
     loop1_gear = 47
-    loop1_increment = 1
+    loop1_increment = 3 # changes this to increase the speed. It controls how many degrees will the first gear move by every iteration
 
     # middle loop
     loop2_origin = [0,8]
@@ -109,6 +127,7 @@ def update(frame):
     loop3_l4 = 14
     loop3_gear = 40
     loop3_increment = loop2_increment * loop2_gear/loop3_gear
+    loop3_omega_2 = 1
     global loop1_theta2
     global loop2_theta2
     global loop3_theta2
@@ -149,29 +168,41 @@ def update(frame):
     loop3_theta1 = find_angle(loop3_origin, loop2_l4_cord[1])
 
     loop3_theta2, loop3_theta3, loop3_theta4 = solve_fourbar(loop3_theta2-loop3_theta1, loop3_l1, loop3_l2, loop3_l3, loop3_l4, 1)
+    
 
     loop3_theta2 = loop3_theta2 + loop3_theta1
     loop3_theta3 = loop3_theta3 + loop3_theta1
     loop3_theta4 = loop3_theta4 + loop3_theta1
+
+    VBA, VB = fourbarvel(loop3_theta1, loop3_theta2, loop3_theta3, loop3_theta4, loop3_l2, loop3_l3, loop3_l4, loop3_omega_2)
+
 
     loop3_l1_cord = get_second_point(loop3_origin, loop3_theta1, loop3_l1)
     loop3_l2_cord = get_second_point(loop3_origin, loop3_theta2, loop3_l2)
     loop3_l3_cord = get_second_point(loop3_l2_cord[1], loop3_theta3, loop3_l3)
     loop3_l4_cord = get_second_point(loop3_l1_cord[1], loop3_theta4, loop3_l4)
 
+    
+
     # Plot each segment
-    plot_line(loop1_l1_cord, label="Loop1 L1")
+    plot_line(loop1_l1_cord, label="Loop1 L1",  linestyle = "dashed")
     plot_line(loop1_l2_cord, label="Loop1 L2")
     plot_line(loop1_l3_cord, label="Loop1 L3")
     plot_line(loop1_l4_cord, label="Loop1 L4")
-    plot_line(loop2_l1_cord, label="Loop2 L1")
+    plot_line(loop2_l1_cord, label="Loop2 L1", linestyle = "dashed")
     plot_line(loop2_l2_cord, label="Loop2 L2")
     plot_line(loop2_l3_cord, label="Loop2 L3")
     plot_line(loop2_l4_cord, label="Loop2 L4")
-    plot_line(loop3_l1_cord, label="Loop3 L1")
+    plot_line(loop3_l1_cord, label="Loop3 L1", linestyle = "dashed")
     plot_line(loop3_l2_cord, label="Loop3 L2")
     plot_line(loop3_l3_cord, label="Loop3 L3")
     plot_line(loop3_l4_cord, label="Loop3 L4")
+
+    # print(loop3_l4_cord[0])
+
+    ax.arrow(loop3_l4_cord[1][0],loop3_l4_cord[1][1],VBA[0],VBA[1],head_width=0.1,width=0.001,length_includes_head=True,linestyle='dashed',color='blue',overhang=1.0)
+    ax.arrow(loop3_l4_cord[1][0],loop3_l4_cord[1][1],VB[0],VB[1],head_width=0.1,width=0.001,length_includes_head=True,linestyle='dashed',color='green',overhang=1.0)
+
 
     # Display the plot
     ax.axhline(0, color='black', linewidth=0.5)
@@ -193,7 +224,9 @@ def update(frame):
 
 
 ani = FuncAnimation(fig, update, frames=100, interval=10)
-plt.show()
+ani.save("fourbar_mechanism.gif", writer=PillowWriter(fps=30))
+
+# plt.show()
 
 
 
